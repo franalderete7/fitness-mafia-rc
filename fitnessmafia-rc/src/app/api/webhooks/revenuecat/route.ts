@@ -1,4 +1,3 @@
-import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
@@ -100,17 +99,8 @@ function verifyWebhookSignature(
 }
 
 // Get raw body as string for signature verification
-function getRawBody(req: NextApiRequest): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let body = '';
-    req.on('data', (chunk) => {
-      body += chunk.toString();
-    });
-    req.on('end', () => {
-      resolve(body);
-    });
-    req.on('error', reject);
-  });
+async function getRawBody(request: Request): Promise<string> {
+  return request.text();
 }
 
 // Handle subscription events
@@ -347,29 +337,21 @@ async function updateUserPremiumStatus(app_user_id: string): Promise<void> {
   }
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  // Only accept POST requests
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
+export async function POST(request: Request) {
   try {
     // Get raw body for signature verification
-    const rawBody = await getRawBody(req);
-    
+    const rawBody = await getRawBody(request);
+
     // Verify webhook signature
-    const signature = req.headers['x-revenuecat-signature'] as string;
+    const signature = request.headers.get('x-revenuecat-signature');
     if (!signature) {
       console.error('Missing RevenueCat signature header');
-      return res.status(401).json({ error: 'Missing signature' });
+      return Response.json({ error: 'Missing signature' }, { status: 401 });
     }
 
     if (!verifyWebhookSignature(rawBody, signature, REVENUECAT_WEBHOOK_SECRET)) {
       console.error('Invalid webhook signature');
-      return res.status(401).json({ error: 'Invalid signature' });
+      return Response.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
     // Parse the webhook payload
@@ -390,32 +372,25 @@ export default async function handler(
       case 'PRODUCT_CHANGE':
         await handleSubscriptionEvent(event);
         break;
-        
+
       case 'TEST':
         console.log('Received test webhook from RevenueCat');
         break;
-        
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
 
-    return res.status(200).json({ 
-      success: true, 
-      message: `Processed ${event.type} event` 
+    return Response.json({
+      success: true,
+      message: `Processed ${event.type} event`
     });
 
   } catch (error) {
     console.error('Error processing RevenueCat webhook:', error);
-    return res.status(500).json({ 
+    return Response.json({
       error: 'Internal server error',
       message: error instanceof Error ? error.message : 'Unknown error'
-    });
+    }, { status: 500 });
   }
-}
-
-// Disable body parser for raw body access
-export const config = {
-  api: {
-    bodyParser: false,
-  },
 }
