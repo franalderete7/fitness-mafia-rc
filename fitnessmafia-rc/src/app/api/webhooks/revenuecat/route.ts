@@ -65,7 +65,7 @@ interface RevenueCatEvent {
   transferred_to?: string[];
   renewal_number?: number;
   aliases?: string[];
-  subscriber_attributes?: Record<string, any>;
+  subscriber_attributes?: Record<string, unknown>;
 }
 
 interface RevenueCatWebhook {
