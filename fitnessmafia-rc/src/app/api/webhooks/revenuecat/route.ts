@@ -1,10 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 
 // Environment variables (replace with your actual values)
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://whjbyzeaiwnsxxsexiir.supabase.co';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoamJ5emVhaXduc3h4c2V4aWlyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1ODIyNzExMywiZXhwIjoyMDczODAzMTEzfQ.VuBfJNbj6YZ87dHRGInT6Qs70ecnW_IrRPShFZsAdSQ';
-const REVENUECAT_WEBHOOK_SECRET = process.env.REVENUECAT_WEBHOOK_SECRET || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndoamJ5emVhaXduc3h4c2V4aWlyIiwicm9s';
 
 // Initialize Supabase client with service key for full access
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
@@ -73,35 +71,6 @@ interface RevenueCatWebhook {
   event: RevenueCatEvent;
 }
 
-// Verify webhook signature
-function verifyWebhookSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  try {
-    const expectedSignature = crypto
-      .createHmac('sha1', secret)
-      .update(payload)
-      .digest('hex');
-    
-    // RevenueCat sends signature in format "sha1=<hash>"
-    const formattedExpected = `sha1=${expectedSignature}`;
-    
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(formattedExpected)
-    );
-  } catch (error) {
-    console.error('Error verifying webhook signature:', error);
-    return false;
-  }
-}
-
-// Get raw body as string for signature verification
-async function getRawBody(request: Request): Promise<string> {
-  return request.text();
-}
 
 // Handle subscription events
 async function handleSubscriptionEvent(event: RevenueCatEvent): Promise<void> {
@@ -339,27 +308,8 @@ async function updateUserPremiumStatus(app_user_id: string): Promise<void> {
 
 export async function POST(request: Request) {
   try {
-    // Get raw body for signature verification
-    const rawBody = await getRawBody(request);
-
-    // Temporarily disabled signature verification for testing
-    // TODO: Re-enable when webhook secret is available
-    /*
-    // Verify webhook signature
-    const signature = request.headers.get('x-revenuecat-signature');
-    if (!signature) {
-      console.error('Missing RevenueCat signature header');
-      return Response.json({ error: 'Missing signature' }, { status: 401 });
-    }
-
-    if (!verifyWebhookSignature(rawBody, signature, REVENUECAT_WEBHOOK_SECRET)) {
-      console.error('Invalid webhook signature');
-      return Response.json({ error: 'Invalid signature' }, { status: 401 });
-    }
-    */
-
     // Parse the webhook payload
-    const webhook: RevenueCatWebhook = JSON.parse(rawBody);
+    const webhook: RevenueCatWebhook = await request.json();
     const { event } = webhook;
 
     console.log(`Received RevenueCat webhook: ${event.type} for user ${event.app_user_id}`);
